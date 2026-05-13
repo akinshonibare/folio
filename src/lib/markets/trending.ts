@@ -46,6 +46,10 @@ export async function fetchTrendingCrypto(): Promise<TrendingCoin[]> {
 }
 
 type YahooTrendingResp = {
+  // Current shape (May 2026):
+  count?: number;
+  quotes?: Array<{ symbol?: string }>;
+  // Older shape (kept as fallback in case Yahoo flips back):
   finance?: { result?: Array<{ quotes?: Array<{ symbol?: string }> }> };
 };
 
@@ -55,8 +59,14 @@ type YahooTrendingResp = {
  */
 export async function fetchTrendingStocks(region = "US") {
   try {
-    const j = (await yahooFinance.trendingSymbols(region)) as YahooTrendingResp;
-    const symbols = (j.finance?.result?.[0]?.quotes ?? [])
+    const j = (await (
+      yahooFinance.trendingSymbols as unknown as (
+        region: string,
+        queryOptions: Record<string, never>,
+        moduleOptions: { validateResult: false },
+      ) => Promise<unknown>
+    )(region, {}, { validateResult: false })) as YahooTrendingResp;
+    const symbols = (j.quotes ?? j.finance?.result?.[0]?.quotes ?? [])
       .map((q) => q.symbol)
       .filter((s): s is string => !!s)
       .slice(0, 8);

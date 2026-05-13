@@ -70,8 +70,8 @@ export function SettingsForm({
         title="Quote provider"
         hint={
           polygonAvailable
-            ? "Yahoo is free and the default. Polygon adds options pricing and Greeks (Phase 7)."
-            : "Yahoo is the only provider on this deployment. Set POLYGON_API_KEY in the environment to enable the Polygon option."
+            ? "Yahoo is free and the default for stocks. Massive (formerly Polygon) is already powering daily-fresh option prices in the background; switching the stock provider here would route equity quotes through it too (paid tier unlocks real-time + Greeks)."
+            : "Yahoo is the only provider on this deployment. Set MASSIVE_API_KEY in the environment to enable the Polygon (Massive) option."
         }
       >
         <select
@@ -81,7 +81,7 @@ export function SettingsForm({
           disabled={!polygonAvailable}
         >
           <option value="yahoo">Yahoo Finance</option>
-          {polygonAvailable && <option value="polygon">Polygon.io</option>}
+          {polygonAvailable && <option value="polygon">Massive (Polygon)</option>}
         </select>
       </Row>
       <Row
