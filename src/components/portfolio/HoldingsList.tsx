@@ -8,21 +8,20 @@ import { PillTabs } from "@/components/ui/PillTabs";
 import { formatPct, formatQuantity } from "@/lib/format";
 import { tickerHref } from "@/lib/markets/symbol";
 import type { HoldingRow } from "@/lib/db/queries";
+import type { LivePosition } from "@/lib/portfolio/live";
 
 type Tab = "ALL" | "EQUITY" | "EXCHANGE_TRADED_FUND" | "CRYPTOCURRENCY";
 
 export function HoldingsList({
   holdings,
-  fxRates,
+  liveByPosition,
 }: {
   holdings: HoldingRow[];
-  fxRates: Record<string, number>;
+  liveByPosition: Map<number, LivePosition>;
 }) {
   const [tab, setTab] = useState<Tab>("ALL");
-  const cad = (r: HoldingRow) => {
-    const fx = fxRates[r.marketValueNativeCurrency];
-    return typeof fx === "number" ? parseFloat(r.marketValueNative) * fx : NaN;
-  };
+  const liveOf = (h: HoldingRow) => liveByPosition.get(h.positionId);
+  const cad = (h: HoldingRow) => liveOf(h)?.liveValueCad ?? NaN;
   const filtered = useMemo(() => {
     const base =
       tab === "ALL"
@@ -30,7 +29,7 @@ export function HoldingsList({
         : holdings.filter((h) => h.securityType === tab);
     return [...base].sort((a, b) => cad(b) - cad(a));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, holdings, fxRates]);
+  }, [tab, holdings, liveByPosition]);
 
   return (
     <div className="space-y-3">
@@ -47,11 +46,14 @@ export function HoldingsList({
       />
       <div className="card divide-y divide-[color:var(--color-border)] overflow-hidden">
         {filtered.map((h) => {
-          const value = cad(h);
+          const live = liveOf(h);
+          const value = live?.liveValueCad ?? NaN;
           const cost = parseFloat(h.bookValueCad);
           const ret = value - cost;
           const retPct = cost > 0 ? (ret / cost) * 100 : 0;
           const pos = ret >= 0;
+          const dayPct = live?.dayChangePct ?? null;
+          const dayPos = (dayPct ?? 0) >= 0;
           return (
             <Link
               key={h.positionId}
@@ -77,23 +79,39 @@ export function HoldingsList({
                   </div>
                 )}
                 <div className="num mt-0.5 text-xs text-[color:var(--color-fg-subtle)]">
-                  {formatQuantity(h.quantity)} @ {parseFloat(h.marketPrice).toFixed(2)} {h.marketPriceCurrency}
+                  {formatQuantity(h.quantity)} ·{" "}
+                  {live ? live.livePrice.toFixed(2) : parseFloat(h.marketPrice).toFixed(2)}{" "}
+                  {live ? live.livePriceCurrency : h.marketPriceCurrency}
                 </div>
               </div>
               <div className="text-right">
                 <div className="num text-sm font-semibold">
                   <Cash amount={value} />
                 </div>
-                <div
-                  className="num text-xs"
-                  style={{
-                    color: pos
-                      ? "var(--color-positive)"
-                      : "var(--color-negative)",
-                  }}
-                >
-                  {formatPct(retPct, { sign: true })}
-                </div>
+                {dayPct != null && (
+                  <div
+                    className="num text-xs"
+                    style={{
+                      color: dayPos
+                        ? "var(--color-positive)"
+                        : "var(--color-negative)",
+                    }}
+                  >
+                    {formatPct(dayPct, { sign: true })} today
+                  </div>
+                )}
+                {dayPct == null && (
+                  <div
+                    className="num text-xs"
+                    style={{
+                      color: pos
+                        ? "var(--color-positive)"
+                        : "var(--color-negative)",
+                    }}
+                  >
+                    {formatPct(retPct, { sign: true })}
+                  </div>
+                )}
               </div>
             </Link>
           );

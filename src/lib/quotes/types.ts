@@ -1,4 +1,4 @@
-export type QuoteProvider = "yahoo" | "polygon";
+export type QuoteProvider = "yahoo" | "polygon" | "finnhub";
 
 export type QuoteAssetKind = "equity" | "etf" | "crypto" | "option";
 

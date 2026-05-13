@@ -48,6 +48,7 @@ export const brokerEnum = pgEnum("broker", ["WEALTHSIMPLE", "OTHER"]);
 export const quoteProviderEnum = pgEnum("quote_provider", [
   "yahoo",
   "polygon",
+  "finnhub",
 ]);
 
 export const displayCurrencyEnum = pgEnum("display_currency", ["CAD", "USD"]);

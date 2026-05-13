@@ -1,0 +1,1 @@
+ALTER TYPE "public"."quote_provider" ADD VALUE 'finnhub';

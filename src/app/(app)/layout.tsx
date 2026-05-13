@@ -4,7 +4,7 @@ import { CurrencyProvider } from "@/components/CurrencyContext";
 import { getUserSettings } from "@/lib/auth/session";
 import { getFxRate } from "@/lib/fx/rates";
 import { getLatestSnapshot, getHoldings } from "@/lib/db/queries";
-import { aggregate } from "@/lib/portfolio/aggregate";
+import { buildLivePortfolio } from "@/lib/portfolio/live";
 
 export default async function AppLayout({
   children,
@@ -20,13 +20,15 @@ export default async function AppLayout({
   if (userId) {
     const s = await getUserSettings(userId);
     if (s?.displayCurrency === "USD") displayCurrency = "USD";
-    // Cheap-enough lookup to power the profile-drawer "Total Worth" header.
+    // Live total powers the profile-drawer "Total Worth" header. Heavy-ish
+    // but Yahoo/Finnhub responses are DB-cached for 5 min so steady-state
+    // requests stay snappy.
     const snap = await getLatestSnapshot(userId);
     if (snap) {
       try {
         const holdings = await getHoldings(userId, snap.id);
-        const summary = await aggregate(holdings);
-        totalCad = summary.totalCad;
+        const live = await buildLivePortfolio(holdings);
+        totalCad = live.totalCad;
       } catch {
         totalCad = null;
       }

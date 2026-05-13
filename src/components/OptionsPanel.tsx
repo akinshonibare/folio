@@ -5,21 +5,23 @@ import Link from "next/link";
 import { Cash } from "./Cash";
 import { daysUntil, formatQuantity } from "@/lib/format";
 import type { HoldingRow } from "@/lib/db/queries";
+import type { LivePosition } from "@/lib/portfolio/live";
 
 /**
- * Delta-style per-contract cards. Each card shows: underlying, strike, expiry,
- * DTE pill, contracts, premium captured (book cost), current value, return.
+ * Delta-style per-contract cards. Each card shows: underlying, strike,
+ * expiry, DTE pill, contracts, premium captured (book cost), current value,
+ * P/L.
  *
- * Phase 3 scope: works off broker-uploaded `Market Price` (premium per share
- * at upload time). Live options pricing + Greeks come with the Polygon adapter
- * (phase 7).
+ * Live options pricing + Greeks remain on the Polygon roadmap. Until then,
+ * value comes from broker-uploaded market price (per share, ×100 contracts
+ * for the position MV).
  */
 export function OptionsPanel({
   holdings,
-  fxRates,
+  liveByPosition,
 }: {
   holdings: HoldingRow[];
-  fxRates: Record<string, number>;
+  liveByPosition: Map<number, LivePosition>;
 }) {
   const options = useMemo(
     () => holdings.filter((h) => h.securityType === "OPTION"),
@@ -30,7 +32,6 @@ export function OptionsPanel({
     return null;
   }
 
-  // Sort by DTE ascending (earliest expiry first — that's what matters for risk).
   const sorted = [...options].sort((a, b) => {
     const ad = a.optionExpiry ? daysUntil(a.optionExpiry) : 9999;
     const bd = b.optionExpiry ? daysUntil(b.optionExpiry) : 9999;
@@ -49,7 +50,11 @@ export function OptionsPanel({
       </div>
       <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
         {sorted.map((o) => (
-          <OptionCard key={o.positionId} opt={o} fxRates={fxRates} />
+          <OptionCard
+            key={o.positionId}
+            opt={o}
+            live={liveByPosition.get(o.positionId)}
+          />
         ))}
       </div>
     </section>
@@ -58,23 +63,19 @@ export function OptionsPanel({
 
 function OptionCard({
   opt,
-  fxRates,
+  live,
 }: {
   opt: HoldingRow;
-  fxRates: Record<string, number>;
+  live: LivePosition | undefined;
 }) {
   const dte = opt.optionExpiry ? daysUntil(opt.optionExpiry) : null;
   const strike = opt.optionStrike ? parseFloat(opt.optionStrike) : null;
-  const qty = parseFloat(opt.quantity); // number of contracts
-  // Surface the missing FX rather than silently treating USD as 1:1 CAD.
-  const fx = fxRates[opt.marketValueNativeCurrency];
-  const fxKnown = typeof fx === "number" && Number.isFinite(fx);
-  const valueCad = fxKnown
-    ? parseFloat(opt.marketValueNative) * fx
-    : NaN;
+  const qty = parseFloat(opt.quantity);
+  const valueCad = live?.liveValueCad ?? NaN;
   const costCad = parseFloat(opt.bookValueCad);
-  const ret = fxKnown ? valueCad - costCad : NaN;
-  const retPct = fxKnown && costCad > 0 ? (ret / costCad) * 100 : 0;
+  const ret = Number.isFinite(valueCad) ? valueCad - costCad : NaN;
+  const retPct =
+    Number.isFinite(ret) && costCad > 0 ? (ret / costCad) * 100 : 0;
   const pos = ret >= 0;
 
   const expiringSoon = dte !== null && dte <= 14;
@@ -99,12 +100,14 @@ function OptionCard({
             style={
               expired
                 ? {
-                    background: "color-mix(in oklch, var(--color-negative) 18%, transparent)",
+                    background:
+                      "color-mix(in oklch, var(--color-negative) 18%, transparent)",
                     color: "var(--color-negative)",
                   }
                 : expiringSoon
                 ? {
-                    background: "color-mix(in oklch, var(--color-warning) 18%, transparent)",
+                    background:
+                      "color-mix(in oklch, var(--color-warning) 18%, transparent)",
                     color: "var(--color-warning)",
                   }
                 : undefined
@@ -117,7 +120,10 @@ function OptionCard({
       </div>
       <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
         <Stat label="Contracts" value={formatQuantity(qty)} />
-        <Stat label="Premium/sh" value={`$${parseFloat(opt.marketPrice).toFixed(2)}`} />
+        <Stat
+          label="Premium/sh"
+          value={`$${parseFloat(opt.marketPrice).toFixed(2)}`}
+        />
         <Stat label="Cost" value={<Cash amount={costCad} />} />
         <Stat label="Value" value={<Cash amount={valueCad} />} />
       </div>
@@ -139,13 +145,7 @@ function OptionCard({
   );
 }
 
-function Stat({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
+function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <>
       <span className="text-[color:var(--color-fg-subtle)]">{label}</span>

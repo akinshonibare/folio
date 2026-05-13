@@ -12,6 +12,7 @@ export function PortfolioHero({
   dayDelta,
   dayDeltaPct,
   asOf,
+  asOfMode,
   optionsCad,
   cryptoCad,
 }: {
@@ -21,6 +22,9 @@ export function PortfolioHero({
   dayDelta: number | null;
   dayDeltaPct: number | null;
   asOf: Date;
+  /** "live" = computed from live market quotes; "snapshot" = falling back
+   *  to broker-uploaded CSV values because live providers were down. */
+  asOfMode?: "live" | "snapshot";
   optionsCad: number;
   cryptoCad: number;
 }) {
@@ -51,7 +55,7 @@ export function PortfolioHero({
       >
         <Cash amount={totalReturnCad} delta cents /> ({formatPct(totalReturnPct, { sign: true })}) all-time
       </p>
-      {dayDelta != null && (
+      {dayDelta != null && dayDelta !== 0 && (
         <p
           className="num mt-0.5 text-xs font-medium"
           style={{
@@ -64,11 +68,11 @@ export function PortfolioHero({
           {dayDeltaPct != null
             ? `(${formatPct(dayDeltaPct, { sign: true })}) `
             : ""}
-          since last upload
+          today
         </p>
       )}
       <p className="mt-2 text-[11px] text-[color:var(--color-fg-subtle)]">
-        as of{" "}
+        {asOfMode === "snapshot" ? "snapshot · " : "live · "}
         {asOf.toLocaleString("en-CA", {
           dateStyle: "medium",
           timeStyle: "short",

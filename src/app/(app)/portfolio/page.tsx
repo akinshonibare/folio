@@ -2,11 +2,10 @@ import Link from "next/link";
 import { ensureUserRow } from "@/lib/auth/session";
 import {
   getLatestSnapshot,
-  getPreviousSnapshot,
   getHoldings,
   getAllSnapshots,
 } from "@/lib/db/queries";
-import { aggregate, computeMovement } from "@/lib/portfolio/aggregate";
+import { buildLivePortfolio } from "@/lib/portfolio/live";
 import { getFxRate } from "@/lib/fx/rates";
 import { TopBar } from "@/components/ui/TopBar";
 import { Section } from "@/components/ui/Section";
@@ -26,9 +25,11 @@ export default async function PortfolioPage() {
       <>
         <TopBar title="Portfolio" />
         <div className="card mt-6 p-6 text-center">
-          <p className="font-semibold">No snapshots yet</p>
+          <p className="font-semibold">No positions yet</p>
           <p className="mt-1 text-sm text-[color:var(--color-fg-muted)]">
-            Upload your first CSV to populate your portfolio.
+            Upload a Wealthsimple holdings CSV to tell folio what you own.
+            After that, the dashboard shows live market value daily — you only
+            need to re-upload when you buy or sell.
           </p>
           <Link href="/upload" className="btn-accent mt-4 inline-flex">
             Upload CSV
@@ -38,55 +39,29 @@ export default async function PortfolioPage() {
     );
   }
 
-  const [holdings, prevSnap] = await Promise.all([
-    getHoldings(userId, snap.id),
-    getPreviousSnapshot(userId, snap.id),
-  ]);
-  const prevHoldings = prevSnap ? await getHoldings(userId, prevSnap.id) : [];
-
-  const currencies = new Set<string>();
-  for (const h of holdings) currencies.add(h.marketValueNativeCurrency);
-  const fxEntries = await Promise.all(
-    Array.from(currencies).map(async (ccy) => {
-      try {
-        return [ccy, await getFxRate(ccy, "CAD")] as const;
-      } catch {
-        return [ccy, ccy === "CAD" ? 1 : NaN] as const;
-      }
-    }),
-  );
-  const fxRates = Object.fromEntries(fxEntries);
-
-  const [summary, movement, valueSeries] = await Promise.all([
-    aggregate(holdings),
-    prevHoldings.length
-      ? computeMovement(holdings, prevHoldings)
-      : Promise.resolve([]),
+  const holdings = await getHoldings(userId, snap.id);
+  const [live, valueSeries] = await Promise.all([
+    buildLivePortfolio(holdings),
     buildValueSeries(userId),
   ]);
-
-  const dayDelta = movement.length
-    ? movement.reduce((s, m) => s + m.deltaCad, 0)
-    : null;
-  const prevTotal = prevHoldings.length
-    ? movement.reduce((s, m) => s + m.previousValueCad, 0)
-    : 0;
-  const dayDeltaPct =
-    dayDelta != null && prevTotal > 0 ? (dayDelta / prevTotal) * 100 : null;
+  // Key by positionId so duplicate-instrument rows (e.g. VFV in both RRSP
+  // and TFSA) each get their own valuation.
+  const liveByPosition = new Map(live.positions.map((p) => [p.positionId, p]));
 
   return (
     <>
       <TopBar title="Portfolio" />
       <div className="space-y-6 pt-2">
         <PortfolioHero
-          totalCad={summary.totalCad}
-          totalReturnCad={summary.totalReturnCad}
-          totalReturnPct={summary.totalReturnPct}
-          dayDelta={dayDelta}
-          dayDeltaPct={dayDeltaPct}
-          asOf={new Date(snap.asOf)}
-          optionsCad={summary.optionsExposureCad}
-          cryptoCad={summary.cryptoExposureCad}
+          totalCad={live.totalCad}
+          totalReturnCad={live.totalReturnCad}
+          totalReturnPct={live.totalReturnPct}
+          dayDelta={live.dayDeltaCad}
+          dayDeltaPct={live.dayDeltaPct}
+          asOf={live.asOf ?? new Date(snap.asOf)}
+          asOfMode={live.asOf ? "live" : "snapshot"}
+          optionsCad={live.optionsCad}
+          cryptoCad={live.cryptoCad}
         />
 
         <Section subhead="Looking back" title="Performance">
@@ -94,15 +69,21 @@ export default async function PortfolioPage() {
         </Section>
 
         <Section subhead="What you hold" title="Holdings">
-          <HoldingsList holdings={holdings} fxRates={fxRates} />
+          <HoldingsList
+            holdings={holdings}
+            liveByPosition={liveByPosition}
+          />
         </Section>
 
         <Section subhead="By account" title="Allocation">
-          <AllocationDonut byClassification={summary.byAccount} />
+          <AllocationDonut byClassification={live.byAccount} />
         </Section>
 
         <Section subhead="Active contracts" title="Options">
-          <OptionsPanel holdings={holdings} fxRates={fxRates} />
+          <OptionsPanel
+            holdings={holdings}
+            liveByPosition={liveByPosition}
+          />
         </Section>
       </div>
     </>

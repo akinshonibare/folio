@@ -18,7 +18,8 @@ export default async function SettingsPage() {
         </div>
         <SettingsForm
           initial={{
-            quoteProvider: settings?.quoteProvider ?? "yahoo",
+            quoteProvider:
+              settings?.quoteProvider === "polygon" ? "polygon" : "yahoo",
             displayCurrency: settings?.displayCurrency ?? "CAD",
             stealthDefault: settings?.stealthDefault ?? false,
             shareDollarsInGroups: settings?.shareDollarsInGroups ?? false,
