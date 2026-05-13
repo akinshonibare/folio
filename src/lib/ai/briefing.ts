@@ -1,10 +1,17 @@
 import { aiClient, AI_MODEL } from "./anthropic";
 import type { MovementRow } from "@/lib/portfolio/aggregate";
 import { fetchYahooNews } from "@/lib/news/yahoo";
+import { getCachedAi, isStillFresh, setCachedAi } from "./cache";
 
 export type Briefing = {
   paragraph: string;
   top: Array<{ symbol: string; deltaPct: number; deltaCad: number }>;
+};
+
+export type BriefingResult = {
+  briefing: Briefing;
+  generatedAt: string;
+  cached: boolean;
 };
 
 const SYSTEM = `You are a financial analyst writing a brief portfolio update for the owner.
@@ -21,9 +28,26 @@ Rules:
 
 export async function buildBriefing(
   movement: MovementRow[],
-): Promise<Briefing | null> {
+  opts: {
+    userId: string;
+    snapshotId: number;
+    refresh?: boolean;
+  },
+): Promise<BriefingResult | null> {
   if (!process.env.ANTHROPIC_API_KEY) return null;
   if (movement.length === 0) return null;
+
+  const cacheKey = `${opts.userId}:${opts.snapshotId}`;
+  if (!opts.refresh) {
+    const hit = await getCachedAi<Briefing>("briefing", cacheKey);
+    if (hit && isStillFresh(hit.generatedAt)) {
+      return {
+        briefing: hit.payload,
+        generatedAt: hit.generatedAt.toISOString(),
+        cached: true,
+      };
+    }
+  }
 
   const ranked = [...movement]
     .filter((m) => m.previousValueCad > 0)
@@ -31,15 +55,10 @@ export async function buildBriefing(
     .slice(0, 5);
   if (ranked.length === 0) return null;
 
-  // Pull a couple of headlines for each top mover to give the model
-  // something to cite.
   const headlines = await Promise.all(
     ranked.slice(0, 3).map(async (m) => {
       const news = await fetchYahooNews(m.symbol, 3).catch(() => []);
-      return {
-        symbol: m.symbol,
-        items: news,
-      };
+      return { symbol: m.symbol, items: news };
     }),
   );
 
@@ -50,15 +69,16 @@ export async function buildBriefing(
     )
     .join("\n");
 
-  const newsBlock = headlines
-    .filter((h) => h.items.length)
-    .map(
-      (h) =>
-        `Headlines for ${h.symbol}:\n${h.items
-          .map((n) => `  - "${n.title}" (${n.publisher ?? "unknown"})`)
-          .join("\n")}`,
-    )
-    .join("\n\n") || "(no headlines)";
+  const newsBlock =
+    headlines
+      .filter((h) => h.items.length)
+      .map(
+        (h) =>
+          `Headlines for ${h.symbol}:\n${h.items
+            .map((n) => `  - "${n.title}" (${n.publisher ?? "unknown"})`)
+            .join("\n")}`,
+      )
+      .join("\n\n") || "(no headlines)";
 
   const userPrompt = `Movers since last snapshot:
 ${moverBlock}
@@ -85,12 +105,19 @@ Write the briefing now.`;
     .join("")
     .trim();
 
-  return {
+  const briefing: Briefing = {
     paragraph: text,
     top: ranked.slice(0, 3).map((m) => ({
       symbol: m.symbol,
       deltaPct: m.deltaPct,
       deltaCad: m.deltaCad,
     })),
+  };
+  const now = new Date();
+  await setCachedAi("briefing", cacheKey, briefing);
+  return {
+    briefing,
+    generatedAt: now.toISOString(),
+    cached: false,
   };
 }

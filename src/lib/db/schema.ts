@@ -11,6 +11,7 @@ import {
   index,
   primaryKey,
   serial,
+  jsonb,
 } from "drizzle-orm/pg-core";
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -394,6 +395,29 @@ export const sentimentCache = pgTable(
   },
   (t) => ({
     pk: primaryKey({ columns: [t.instrumentId, t.source] }),
+  }),
+);
+
+// ──────────────────────────────────────────────────────────────────────────
+// AI commentary cache — shared across users for symbol-keyed entries
+// (explain), per-user for briefing. Refresh schedule matches three daily
+// windows: 08:00 / 13:00 / 20:00 local. A row is considered "fresh" if
+// `generated_at >= currentWindowStart()`. Manual refresh bypasses.
+// ──────────────────────────────────────────────────────────────────────────
+
+export const aiCache = pgTable(
+  "ai_cache",
+  {
+    id: serial("id").primaryKey(),
+    kind: text("kind").notNull(), // 'explain' | 'briefing'
+    key: text("key").notNull(),
+    payload: jsonb("payload").notNull(),
+    generatedAt: timestamp("generated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    uniqKindKey: uniqueIndex("ai_cache_kind_key_uniq").on(t.kind, t.key),
   }),
 );
 

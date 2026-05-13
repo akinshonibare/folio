@@ -8,11 +8,12 @@ import {
   getHoldings,
 } from "@/lib/db/queries";
 import { computeMovement } from "@/lib/portfolio/aggregate";
+import { nextWindowStart } from "@/lib/ai/cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: Request) {
   const userId = await getApiUserId();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -20,6 +21,7 @@ export async function GET() {
   if (!aiAvailable()) {
     return NextResponse.json({ available: false });
   }
+  const refresh = new URL(req.url).searchParams.get("refresh") === "1";
 
   const snap = await getLatestSnapshot(userId);
   if (!snap) {
@@ -40,8 +42,18 @@ export async function GET() {
   const movement = await computeMovement(holdings, prevHoldings);
 
   try {
-    const briefing = await buildBriefing(movement);
-    return NextResponse.json({ available: true, briefing });
+    const result = await buildBriefing(movement, {
+      userId,
+      snapshotId: snap.id,
+      refresh,
+    });
+    return NextResponse.json({
+      available: true,
+      briefing: result?.briefing ?? null,
+      generatedAt: result?.generatedAt ?? null,
+      cached: result?.cached ?? false,
+      nextRefreshAt: nextWindowStart().toISOString(),
+    });
   } catch (e) {
     return NextResponse.json({
       available: true,

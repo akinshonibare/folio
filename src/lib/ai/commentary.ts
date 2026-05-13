@@ -2,10 +2,17 @@ import { aiClient, AI_MODEL } from "./anthropic";
 import { fetchYahooNews, type NewsItem } from "@/lib/news/yahoo";
 import { fetchStockTwitsSentiment } from "@/lib/sentiment/stocktwits";
 import { yahooSymbolFor } from "@/lib/markets/symbol";
+import { getCachedAi, isStillFresh, setCachedAi } from "./cache";
 
 export type Commentary = {
   paragraph: string;
   citations: { title: string; link: string; publisher: string | null }[];
+};
+
+export type CommentaryResult = {
+  commentary: Commentary;
+  generatedAt: string; // ISO
+  cached: boolean;
 };
 
 const SYSTEM = `You are a financial market analyst writing for a personal portfolio app.
@@ -31,8 +38,23 @@ export async function explainMovement(params: {
   changePct: number | null;
   exchange?: string | null;
   securityType?: string | null;
-}): Promise<Commentary | null> {
+  /** When true, ignore the DB cache and force a fresh Claude call. */
+  refresh?: boolean;
+}): Promise<CommentaryResult | null> {
   if (!process.env.ANTHROPIC_API_KEY) return null;
+
+  const symbol = params.symbol.toUpperCase();
+  const cacheKey = symbol;
+  if (!params.refresh) {
+    const hit = await getCachedAi<Commentary>("explain", cacheKey);
+    if (hit && isStillFresh(hit.generatedAt)) {
+      return {
+        commentary: hit.payload,
+        generatedAt: hit.generatedAt.toISOString(),
+        cached: true,
+      };
+    }
+  }
 
   // Resolve to the right Yahoo symbol so CDR positions (GOOG on TSX) pull
   // CAD-listing news, not the US-share news.
@@ -98,12 +120,19 @@ Write the explanation now.`;
     .join("")
     .trim();
 
-  return {
+  const commentary: Commentary = {
     paragraph: text,
     citations: news.slice(0, 3).map((n) => ({
       title: n.title,
       link: n.link,
       publisher: n.publisher,
     })),
+  };
+  const now = new Date();
+  await setCachedAi("explain", cacheKey, commentary);
+  return {
+    commentary,
+    generatedAt: now.toISOString(),
+    cached: false,
   };
 }

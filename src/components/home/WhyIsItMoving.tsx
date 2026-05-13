@@ -1,21 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { TickerIcon } from "@/components/ui/TickerIcon";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, RefreshCw } from "lucide-react";
 
 type Citation = { title: string; link: string; publisher: string | null };
 
 type ApiResp = {
   available: boolean;
   commentary?: { paragraph: string; citations: Citation[] } | null;
+  generatedAt?: string | null;
+  cached?: boolean;
   error?: string;
 };
 
 /**
- * Pulls AI-generated commentary for the top mover. Falls back to a clear
- * "needs ANTHROPIC_API_KEY" message if the server doesn't have a key, and
- * shows a friendly error if the call fails.
+ * Pulls AI-generated commentary for a symbol. Server-side cache aligned to
+ * three daily windows (08:00 / 13:00 / 20:00) keeps cost low — manual refresh
+ * button forces a fresh Claude call.
  */
 export function WhyIsItMoving({
   symbol,
@@ -33,27 +35,50 @@ export function WhyIsItMoving({
   securityType?: string | null;
 }) {
   const [resp, setResp] = useState<ApiResp | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchIt = useCallback(
+    async (refresh = false) => {
+      const qs = new URLSearchParams();
+      if (name) qs.set("name", name);
+      if (changePct != null) qs.set("changePct", String(changePct));
+      if (exchange) qs.set("exchange", exchange);
+      if (securityType) qs.set("securityType", securityType);
+      if (refresh) qs.set("refresh", "1");
+      try {
+        const r = await fetch(
+          `/api/ai/explain/${encodeURIComponent(symbol)}?${qs}`,
+        );
+        const j = (await r.json()) as ApiResp;
+        return j;
+      } catch {
+        return {
+          available: true,
+          error: "network error",
+          commentary: null,
+        } as ApiResp;
+      }
+    },
+    [symbol, name, changePct, exchange, securityType],
+  );
 
   useEffect(() => {
     let cancelled = false;
-    const qs = new URLSearchParams();
-    if (name) qs.set("name", name);
-    if (changePct != null) qs.set("changePct", String(changePct));
-    if (exchange) qs.set("exchange", exchange);
-    if (securityType) qs.set("securityType", securityType);
-    fetch(`/api/ai/explain/${encodeURIComponent(symbol)}?${qs}`)
-      .then((r) => r.json())
-      .then((j) => {
-        if (!cancelled) setResp(j);
-      })
-      .catch(() => {
-        if (!cancelled)
-          setResp({ available: true, error: "network error", commentary: null });
-      });
+    setResp(null);
+    fetchIt().then((j) => {
+      if (!cancelled) setResp(j);
+    });
     return () => {
       cancelled = true;
     };
-  }, [symbol, name, changePct, exchange, securityType]);
+  }, [fetchIt]);
+
+  async function refresh() {
+    setRefreshing(true);
+    const j = await fetchIt(true);
+    setResp(j);
+    setRefreshing(false);
+  }
 
   const loading = resp == null;
   const unavailable = resp && resp.available === false;
@@ -78,15 +103,32 @@ export function WhyIsItMoving({
                 <p className="truncate text-xs text-white/70">{name}</p>
               )}
             </div>
-            <span className="shrink-0 text-[11px] uppercase tracking-wider text-white/60">
-              {loading
-                ? "writing…"
-                : unavailable
-                ? "AI not configured"
-                : errored
-                ? "AI error"
-                : "AI commentary"}
-            </span>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="text-[11px] uppercase tracking-wider text-white/60">
+                {loading
+                  ? "writing…"
+                  : unavailable
+                  ? "AI not configured"
+                  : errored
+                  ? "AI error"
+                  : resp?.cached
+                  ? "cached"
+                  : "fresh"}
+              </span>
+              <button
+                type="button"
+                onClick={refresh}
+                disabled={refreshing || loading || !!unavailable}
+                aria-label="Refresh"
+                title="Regenerate"
+                className="rounded-full p-1 text-white/70 hover:text-white disabled:opacity-40"
+              >
+                <RefreshCw
+                  size={13}
+                  className={refreshing ? "animate-spin" : ""}
+                />
+              </button>
+            </div>
           </div>
 
           <div className="mt-3 text-sm leading-snug text-white/90">
@@ -97,13 +139,22 @@ export function WhyIsItMoving({
             )}
             {unavailable && (
               <span>
-                Set <code className="rounded bg-black/40 px-1 text-xs">ANTHROPIC_API_KEY</code>{" "}
+                Set{" "}
+                <code className="rounded bg-black/40 px-1 text-xs">
+                  ANTHROPIC_API_KEY
+                </code>{" "}
                 in your environment to enable per-position commentary.
               </span>
             )}
             {errored && <span className="opacity-80">{resp?.error}</span>}
             {c && c.paragraph && <p>{c.paragraph}</p>}
           </div>
+
+          {resp?.generatedAt && (
+            <p className="mt-2 text-[10px] text-white/50">
+              generated {formatRelative(resp.generatedAt)}
+            </p>
+          )}
 
           {price != null && (
             <div className="mt-3 flex items-baseline gap-3 text-sm">
@@ -151,4 +202,16 @@ export function WhyIsItMoving({
       </div>
     </div>
   );
+}
+
+function formatRelative(iso: string): string {
+  const then = new Date(iso).getTime();
+  const ms = Date.now() - then;
+  const m = Math.floor(ms / 60_000);
+  if (m < 1) return "moments ago";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
 }
