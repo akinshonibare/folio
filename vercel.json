@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/refresh-options",
+      "schedule": "30 1 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-earnings",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-insider",
+      "schedule": "0 6 * * *"
+    }
+  ]
+}

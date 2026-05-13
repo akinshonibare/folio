@@ -10,7 +10,9 @@ import { TopBar } from "@/components/ui/TopBar";
 import { Section } from "@/components/ui/Section";
 import { WhyIsItMoving } from "@/components/home/WhyIsItMoving";
 import { DailyBriefing } from "@/components/insights/DailyBriefing";
+import { InsiderMoves } from "@/components/insights/InsiderMoves";
 import { TickerRow } from "@/components/ui/TickerRow";
+import { getInsiderForSymbols } from "@/lib/db/calendar";
 
 export const dynamic = "force-dynamic";
 
@@ -52,22 +54,40 @@ export default async function InsightsPage() {
     .sort((a, b) => parseFloat(b.bookValueCad) - parseFloat(a.bookValueCad))
     .slice(0, 6);
   const symbols = topPositions.map((p) => p.symbol);
+  const heldSymbols = Array.from(
+    new Set(
+      holdings
+        .filter(
+          (h) =>
+            h.securityType !== "OPTION" && h.securityType !== "CRYPTOCURRENCY",
+        )
+        .map((h) => h.symbol),
+    ),
+  );
   let quoteMap = new Map<string, YahooQuote>();
-  if (symbols.length) {
-    try {
-      const q = (await yahooFinance.quote(symbols)) as
-        | YahooQuote[]
-        | YahooQuote;
-      const arr = Array.isArray(q) ? q : [q];
-      quoteMap = new Map(
-        arr
-          .filter((x) => (x as { symbol?: string }).symbol)
-          .map((x) => [
-            (x as { symbol?: string }).symbol!.toUpperCase(),
-            x,
-          ]),
-      );
-    } catch {}
+  const yQuotePromise: Promise<YahooQuote[] | YahooQuote | null> = symbols.length
+    ? (yahooFinance.quote(symbols) as Promise<YahooQuote[] | YahooQuote>).catch(
+        () => null,
+      )
+    : Promise.resolve(null);
+  const [quotesP, insider] = await Promise.all([
+    yQuotePromise,
+    heldSymbols.length
+      ? getInsiderForSymbols(heldSymbols, 12)
+      : Promise.resolve([]),
+  ]);
+  if (quotesP) {
+    const arr = Array.isArray(quotesP)
+      ? (quotesP as YahooQuote[])
+      : ([quotesP] as YahooQuote[]);
+    quoteMap = new Map(
+      arr
+        .filter((x) => (x as { symbol?: string }).symbol)
+        .map((x) => [
+          (x as { symbol?: string }).symbol!.toUpperCase(),
+          x,
+        ]),
+    );
   }
 
   return (
@@ -104,6 +124,10 @@ export default async function InsightsPage() {
               );
             })}
           </div>
+        </Section>
+
+        <Section subhead="Follow the insiders" title="Top Insider Moves">
+          <InsiderMoves rows={insider} />
         </Section>
       </div>
     </>

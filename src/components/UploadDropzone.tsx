@@ -43,6 +43,10 @@ export function UploadDropzone() {
           duplicate: !!json.duplicate,
         });
         router.refresh();
+        // Fire-and-forget: refresh options EOD prices for the new positions.
+        // Takes ~3 min on Polygon free tier; the user is navigating away by
+        // the time it completes. Next dashboard load reads from `live_quotes`.
+        fetch("/api/quotes/options/refresh", { method: "POST" }).catch(() => {});
       } catch (e) {
         setStatus({
           kind: "error",

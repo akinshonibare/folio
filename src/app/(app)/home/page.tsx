@@ -8,7 +8,7 @@ import {
 import { getWatchlist } from "@/lib/db/watchlist";
 import { computeMovement } from "@/lib/portfolio/aggregate";
 import { fetchTrendingCrypto, fetchTrendingStocks } from "@/lib/markets/trending";
-import { fetchUpcomingEvents } from "@/lib/markets/earnings";
+import { getUpcomingEventsForSymbols } from "@/lib/db/calendar";
 import { fetchYahooNews, type NewsItem } from "@/lib/news/yahoo";
 import { TopBar } from "@/components/ui/TopBar";
 import { Section, SeeAllLink } from "@/components/ui/Section";
@@ -62,16 +62,27 @@ export default async function HomePage() {
       ].filter(Boolean),
     ),
   );
-  const [trendingCrypto, trendingStocks, events, news] = await Promise.all([
+  const [trendingCrypto, trendingStocks, eventsRaw, news] = await Promise.all([
     fetchTrendingCrypto(),
     fetchTrendingStocks("US"),
     heldSymbols.length
-      ? fetchUpcomingEvents(heldSymbols.slice(0, 20))
+      ? getUpcomingEventsForSymbols(heldSymbols)
       : Promise.resolve([]),
     topMover
       ? fetchYahooNews(topMover.symbol, 5)
       : Promise.resolve([] as NewsItem[]),
   ]);
+  // UpcomingEvents component expects { symbol, name, date, kind }. Names
+  // come from the position rows we already have.
+  const nameBySymbol = new Map(
+    holdings.map((h) => [h.symbol, h.name] as const),
+  );
+  const events = eventsRaw.map((e) => ({
+    symbol: e.symbol,
+    name: nameBySymbol.get(e.symbol) ?? null,
+    date: e.date,
+    kind: e.kind as "EARNINGS" | "DIVIDEND",
+  }));
 
   return (
     <>

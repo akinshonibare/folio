@@ -423,6 +423,66 @@ export const aiCache = pgTable(
 );
 
 // ──────────────────────────────────────────────────────────────────────────
+// Earnings / dividend calendar events. Shared across users (symbol-keyed),
+// refreshed daily by a cron pulling from Finnhub. The UpcomingEvents panel
+// reads from here so the dashboard never blocks on a live Finnhub call.
+// ──────────────────────────────────────────────────────────────────────────
+
+export const earningsEvents = pgTable(
+  "earnings_events",
+  {
+    id: serial("id").primaryKey(),
+    symbol: text("symbol").notNull(),
+    date: date("date").notNull(),
+    kind: text("kind").notNull(), // 'EARNINGS' | 'DIVIDEND'
+    epsActual: numeric("eps_actual", { precision: 12, scale: 4 }),
+    epsEstimate: numeric("eps_estimate", { precision: 12, scale: 4 }),
+    quarter: integer("quarter"),
+    year: integer("year"),
+    hour: text("hour"), // 'amc' | 'bmo' | etc
+    fetchedAt: timestamp("fetched_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    uniq: uniqueIndex("earnings_events_uniq").on(t.symbol, t.date, t.kind),
+    idxDate: index("earnings_events_date_idx").on(t.date),
+  }),
+);
+
+// ──────────────────────────────────────────────────────────────────────────
+// Insider transactions cache — Finnhub, per symbol, last 90 days.
+// ──────────────────────────────────────────────────────────────────────────
+
+export const insiderTransactions = pgTable(
+  "insider_transactions",
+  {
+    id: serial("id").primaryKey(),
+    symbol: text("symbol").notNull(),
+    insiderName: text("insider_name").notNull(),
+    filingDate: date("filing_date").notNull(),
+    transactionDate: date("transaction_date").notNull(),
+    shares: numeric("shares", { precision: 18, scale: 4 }).notNull(),
+    change: numeric("change", { precision: 18, scale: 4 }).notNull(), // negative = sell
+    price: numeric("price", { precision: 18, scale: 4 }).notNull(),
+    code: text("code").notNull(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    uniq: uniqueIndex("insider_transactions_uniq").on(
+      t.symbol,
+      t.filingDate,
+      t.insiderName,
+      t.transactionDate,
+      t.shares,
+    ),
+    idxSymbol: index("insider_transactions_symbol_idx").on(t.symbol),
+  }),
+);
+
+// ──────────────────────────────────────────────────────────────────────────
 // FX rate cache — keyed on (date, base→quote).
 // ──────────────────────────────────────────────────────────────────────────
 
