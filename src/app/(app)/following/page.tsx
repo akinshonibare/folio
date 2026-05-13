@@ -3,9 +3,7 @@ import yahooFinance from "yahoo-finance2";
 import { ensureUserRow } from "@/lib/auth/session";
 import { getWatchlist } from "@/lib/db/watchlist";
 import { TopBar } from "@/components/ui/TopBar";
-import { Section } from "@/components/ui/Section";
-import { TickerRow } from "@/components/ui/TickerRow";
-import { FollowingFilters } from "@/components/following/FollowingFilters";
+import { FollowingList, type FollowingItem } from "@/components/following/FollowingList";
 
 export const dynamic = "force-dynamic";
 
@@ -40,10 +38,15 @@ export default async function FollowingPage() {
       .map((q) => [q.symbol!.toUpperCase(), q]),
   );
 
-  const enriched = items.map((it) => {
+  const enriched: FollowingItem[] = items.map((it) => {
     const q = quoteBySymbol.get(it.symbol.toUpperCase());
     return {
-      ...it,
+      id: it.id,
+      symbol: it.symbol,
+      exchange: it.exchange,
+      name: it.name ?? q?.longName ?? q?.shortName ?? null,
+      securityType: it.securityType,
+      graduated: it.graduated,
       price: q?.regularMarketPrice ?? null,
       currency: q?.currency ?? null,
       changeAbs: q?.regularMarketChange ?? null,
@@ -58,37 +61,16 @@ export default async function FollowingPage() {
       <div className="space-y-4 pt-2">
         {items.length === 0 ? (
           <div className="card p-6 text-center text-sm text-[color:var(--color-fg-muted)]">
-            Your watchlist is empty. Use ⌘K to search, then tap the star on a
-            ticker page.
+            Your watchlist is empty. Use ⌘K to search any ticker, then tap the
+            star on its detail page.
+            <div className="mt-3">
+              <Link href="/markets" className="underline">
+                Discover from Markets
+              </Link>
+            </div>
           </div>
         ) : (
-          <>
-            <FollowingFilters />
-            <Section subhead="" title="">
-              <div className="card divide-y divide-[color:var(--color-border)] overflow-hidden">
-                {[...enriched]
-                  .sort((a, b) => b.marketCap - a.marketCap)
-                  .map((it) => (
-                    <TickerRow
-                      key={it.id}
-                      symbol={it.symbol}
-                      name={it.name}
-                      price={it.price}
-                      currency={it.currency}
-                      changeAbs={it.changeAbs}
-                      changePct={it.changePct}
-                    />
-                  ))}
-              </div>
-              <p className="mt-3 text-center text-[11px] text-[color:var(--color-fg-subtle)]">
-                Tap any ticker for full detail.{" "}
-                <Link href="/markets" className="underline">
-                  Discover more
-                </Link>
-                .
-              </p>
-            </Section>
-          </>
+          <FollowingList items={enriched} />
         )}
       </div>
     </>

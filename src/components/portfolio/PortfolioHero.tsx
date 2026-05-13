@@ -60,10 +60,11 @@ export function PortfolioHero({
               : "var(--color-negative)",
           }}
         >
-          <Cash amount={dayDelta} delta cents /> today
+          <Cash amount={dayDelta} delta cents />{" "}
           {dayDeltaPct != null
-            ? ` (${formatPct(dayDeltaPct, { sign: true })})`
+            ? `(${formatPct(dayDeltaPct, { sign: true })}) `
             : ""}
+          since last upload
         </p>
       )}
       <p className="mt-2 text-[11px] text-[color:var(--color-fg-subtle)]">

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Trash2 } from "lucide-react";
 
 type Settings = {
   quoteProvider: "yahoo" | "polygon";
@@ -105,6 +107,93 @@ export function SettingsForm({
         {status === "saved" && "Saved."}
         {status === "error" && err && (
           <span className="text-[color:var(--color-negative)]">{err}</span>
+        )}
+      </div>
+
+      <div className="mt-10">
+        <p className="subhead">Danger zone</p>
+        <h2 className="section-title mt-1">Reset</h2>
+        <DangerReset />
+      </div>
+    </div>
+  );
+}
+
+function DangerReset() {
+  const [stage, setStage] = useState<"idle" | "confirming" | "deleting" | "done" | "error">("idle");
+  const [err, setErr] = useState<string | null>(null);
+  const router = useRouter();
+
+  async function doReset() {
+    setStage("deleting");
+    setErr(null);
+    try {
+      const res = await fetch("/api/portfolio/reset?confirm=DELETE", {
+        method: "DELETE",
+      });
+      const j = await res.json();
+      if (!res.ok) {
+        setStage("error");
+        setErr(j.error ?? "Reset failed");
+        return;
+      }
+      setStage("done");
+      setTimeout(() => router.push("/home"), 1200);
+    } catch (e) {
+      setStage("error");
+      setErr(e instanceof Error ? e.message : "Reset failed");
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-2xl border border-[color:var(--color-negative)]/50 bg-[color:var(--color-negative-soft)] p-5">
+      <h3 className="font-semibold">Reset portfolio</h3>
+      <p className="mt-1 text-sm text-[color:var(--color-fg-muted)]">
+        Delete every snapshot, position, account, and watchlist entry tied to
+        your account. Your sign-in and settings stay. There's no undo — you'll
+        need to re-upload a CSV afterward.
+      </p>
+      <div className="mt-4 flex items-center gap-2">
+        {stage === "idle" && (
+          <button
+            type="button"
+            onClick={() => setStage("confirming")}
+            className="flex items-center gap-2 rounded-full bg-[color:var(--color-negative)]/15 px-4 py-2 text-sm font-semibold text-[color:var(--color-negative)] hover:bg-[color:var(--color-negative)]/25"
+          >
+            <Trash2 size={14} />
+            Reset all data
+          </button>
+        )}
+        {stage === "confirming" && (
+          <>
+            <button
+              type="button"
+              onClick={doReset}
+              className="rounded-full bg-[color:var(--color-negative)] px-4 py-2 text-sm font-semibold text-white"
+            >
+              Yes, delete everything
+            </button>
+            <button
+              type="button"
+              onClick={() => setStage("idle")}
+              className="rounded-full px-3 py-2 text-sm text-[color:var(--color-fg-muted)]"
+            >
+              Cancel
+            </button>
+          </>
+        )}
+        {stage === "deleting" && (
+          <span className="text-sm text-[color:var(--color-fg-muted)]">
+            Deleting…
+          </span>
+        )}
+        {stage === "done" && (
+          <span className="text-sm text-[color:var(--color-positive)]">
+            Reset complete. Redirecting…
+          </span>
+        )}
+        {stage === "error" && err && (
+          <span className="text-sm text-[color:var(--color-negative)]">{err}</span>
         )}
       </div>
     </div>

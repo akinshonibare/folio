@@ -10,11 +10,16 @@ type Ctx = {
   /** Live FX: 1 USD = cadPerUsd CAD. Used to convert stored CAD totals to USD
    *  on the client at render time. */
   cadPerUsd: number;
+  /** Current portfolio total in CAD, computed server-side once per request
+   *  and exposed to client components (e.g. the profile drawer) without
+   *  needing a round-trip. Null when the user has no snapshots yet. */
+  totalCad: number | null;
 };
 
 const CurrencyCtx = createContext<Ctx>({
   displayCurrency: "CAD",
   cadPerUsd: 1,
+  totalCad: null,
 });
 
 export function CurrencyProvider({

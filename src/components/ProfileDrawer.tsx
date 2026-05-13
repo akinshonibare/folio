@@ -2,19 +2,26 @@
 
 import Link from "next/link";
 import { useUser, useClerk } from "@clerk/nextjs";
-import { X, Link2, Settings as SettingsIcon, LogOut, RefreshCw, Wallet, Upload } from "lucide-react";
+import {
+  X,
+  Settings as SettingsIcon,
+  LogOut,
+  Upload,
+  Users,
+} from "lucide-react";
 import { useStealth } from "./StealthContext";
+import { useCurrency } from "./CurrencyContext";
 import { Cash } from "./Cash";
 
 export function ProfileDrawer({
   open,
   onClose,
-  totalWorth,
 }: {
   open: boolean;
   onClose: () => void;
-  totalWorth?: number;
 }) {
+  const { totalCad } = useCurrency();
+  const totalWorth = totalCad;
   const { user } = useUser();
   const { signOut } = useClerk();
   const { stealth, toggle } = useStealth();
@@ -73,9 +80,12 @@ export function ProfileDrawer({
         </div>
 
         <div className="mt-8 card-row divide-y divide-[color:var(--color-border)]">
-          <DrawerRow icon={<RefreshCw size={18} />} label="Auto refreshing prices">
-            <Toggle on={true} />
-          </DrawerRow>
+          <DrawerLink
+            href="/groups"
+            icon={<Users size={18} />}
+            label="Groups"
+            onNavigate={onClose}
+          />
         </div>
 
         <div className="mt-4 card-row divide-y divide-[color:var(--color-border)]">
@@ -97,24 +107,6 @@ export function ProfileDrawer({
           folio · beta
         </p>
       </div>
-    </div>
-  );
-}
-
-function DrawerRow({
-  icon,
-  label,
-  children,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  children?: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-center gap-3 px-4 py-4 text-[15px] font-medium">
-      <span className="text-[color:var(--color-fg-muted)]">{icon}</span>
-      <span className="flex-1">{label}</span>
-      {children}
     </div>
   );
 }
@@ -142,18 +134,3 @@ function DrawerLink({
   );
 }
 
-function Toggle({ on }: { on: boolean }) {
-  return (
-    <span
-      className={`relative inline-block h-6 w-11 rounded-full transition ${
-        on ? "bg-white" : "bg-[color:var(--color-surface-3)]"
-      }`}
-    >
-      <span
-        className={`absolute top-0.5 h-5 w-5 rounded-full bg-[color:var(--color-surface-3)] transition ${
-          on ? "left-[1.4rem]" : "left-0.5"
-        }`}
-      />
-    </span>
-  );
-}
