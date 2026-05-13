@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+/* ─── Delta-inspired theme tokens ───────────────────────────────────────────
+ * Reference: Delta by eToro uses a soft dark navy (not pure black), generous
+ * card spacing, rounded corners, a vibrant green for gains, a punchy magenta-
+ * leaning red for losses, and a cool blue-purple as the primary accent.
+ * Typography is tabular for numbers.
+ */
+@theme {
+  /* Surfaces */
+  --color-bg: oklch(15% 0.01 260);            /* #0B0E16 — deep navy-black */
+  --color-surface: oklch(19% 0.012 260);      /* card */
+  --color-surface-2: oklch(23% 0.014 260);    /* hover / elevated card */
+  --color-border: oklch(28% 0.015 260);
+
+  /* Text */
+  --color-fg: oklch(96% 0.005 260);
+  --color-fg-muted: oklch(70% 0.015 260);
+  --color-fg-subtle: oklch(52% 0.015 260);
+
+  /* Accents */
+  --color-accent: oklch(70% 0.18 270);        /* primary action: cool blue-purple */
+  --color-accent-fg: oklch(98% 0.01 270);
+  --color-positive: oklch(76% 0.22 145);      /* gains */
+  --color-negative: oklch(66% 0.24 12);       /* losses — magenta-red */
+  --color-warning: oklch(80% 0.16 80);
+
+  /* Radii — Delta cards are generously rounded */
+  --radius-card: 1rem;
+  --radius-pill: 9999px;
+
+  /* Font stacks */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tabular numbers everywhere a dollar amount or percentage might appear */
+.num,
+[data-num] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Reusable Delta-style card */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+/* Pill — used for filters, tags, allocation chips */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+  color: var(--color-fg-muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
