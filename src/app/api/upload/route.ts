@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { ensureUserRow } from "@/lib/auth/session";
+import { ensureUserRowForApi } from "@/lib/auth/session";
 import { parseWealthsimpleCsv } from "@/lib/csv/parse";
 import { ingestCsv } from "@/lib/db/upsert";
 
@@ -13,10 +13,8 @@ const Body = z.object({
 });
 
 export async function POST(req: Request) {
-  let userId: string;
-  try {
-    userId = await ensureUserRow();
-  } catch {
+  const userId = await ensureUserRowForApi();
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

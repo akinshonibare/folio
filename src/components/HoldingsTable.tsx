@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Cash } from "./Cash";
 import { formatPct, formatQuantity } from "@/lib/format";
 import type { HoldingRow } from "@/lib/db/queries";
@@ -84,12 +85,17 @@ export function HoldingsTable({
                   className="border-t border-[color:var(--color-border)]/60 transition hover:bg-[color:var(--color-surface-2)]/40"
                 >
                   <td className="px-5 py-3">
-                    <div className="font-medium">{h.symbol}</div>
-                    {h.name && (
-                      <div className="text-xs text-[color:var(--color-fg-subtle)]">
-                        {h.name}
-                      </div>
-                    )}
+                    <Link
+                      href={`/t/${encodeURIComponent(h.symbol)}`}
+                      className="block transition hover:text-[color:var(--color-accent)]"
+                    >
+                      <div className="font-medium">{h.symbol}</div>
+                      {h.name && (
+                        <div className="text-xs text-[color:var(--color-fg-subtle)]">
+                          {h.name}
+                        </div>
+                      )}
+                    </Link>
                   </td>
                   <td className="px-3 py-3">
                     <span className="pill text-xs">{h.accountClassification}</span>

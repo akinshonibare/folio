@@ -2,6 +2,18 @@ import { db, schema } from "@/lib/db/client";
 import { and, desc, eq, sql } from "drizzle-orm";
 
 /**
+ * All snapshots for a user, ordered ascending by as_of date. Used to plot
+ * portfolio value over time.
+ */
+export async function getAllSnapshots(userId: string) {
+  return db()
+    .select()
+    .from(schema.snapshots)
+    .where(eq(schema.snapshots.userId, userId))
+    .orderBy(schema.snapshots.asOf);
+}
+
+/**
  * Latest snapshot for a user. Returns null if they've never uploaded.
  */
 export async function getLatestSnapshot(userId: string) {
@@ -75,6 +87,33 @@ export type HoldingRow = {
  * Filtered to a single user for safety even though `snapshotId` already
  * disambiguates — defense in depth against bad call sites.
  */
+/**
+ * All positions across the user's latest snapshot that map to a given
+ * symbol — across all accounts and (for options) all strikes/expiries on the
+ * same underlying. Used to power the ticker detail page's "your position"
+ * card.
+ *
+ * `symbol` may be the fully-qualified Yahoo identifier (e.g. "GOOG.NE",
+ * "SHOP.TO", "BTC-USD") — we strip the venue suffix before matching against
+ * the bare-ticker form stored on `positions.symbol` from the broker CSV.
+ */
+export async function getPositionsForSymbol(
+  userId: string,
+  symbol: string,
+): Promise<HoldingRow[]> {
+  const latest = await getLatestSnapshot(userId);
+  if (!latest) return [];
+  const all = await getHoldings(userId, latest.id);
+  const up = symbol.toUpperCase();
+  const bare = up.replace(/\.(NE|TO|V|TSX)$/, "").replace(/-USD$/, "");
+  return all.filter(
+    (h) =>
+      h.symbol === up ||
+      h.symbol === bare ||
+      (h.securityType === "OPTION" && h.optionUnderlying === bare),
+  );
+}
+
 export async function getHoldings(
   userId: string,
   snapshotId: number,

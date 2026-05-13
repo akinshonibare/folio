@@ -33,6 +33,10 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   async headers() {
+    // Skip strict CSP in development so the Claude Preview iframe (and
+    // anything else that wraps localhost in a frame) can load the app.
+    // Production keeps the full hardened headers.
+    if (process.env.NODE_ENV !== "production") return [];
     return [{ source: "/:path*", headers: securityHeaders }];
   },
 };

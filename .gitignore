@@ -14,6 +14,10 @@ next-env.d.ts
 .vercel
 .idea
 .vscode
+.claude
+
+# Reference screenshots used while building the UI; not part of the app.
+delta-images/
 
 # drizzle
 drizzle/meta

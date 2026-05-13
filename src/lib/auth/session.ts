@@ -1,26 +1,34 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 import { db, schema } from "@/lib/db/client";
 import { eq } from "drizzle-orm";
 
 /**
- * Resolve the current user id (Clerk subject). Throws if not signed in.
- * Callers in protected routes can use this directly; middleware already
- * gates anonymous traffic.
+ * Server-component flavour: resolve the current user id, or redirect to
+ * /sign-in. Per Clerk's Next.js App Router pattern the proxy does NOT
+ * protect routes — pages own their own auth checks.
  */
 export async function requireUserId(): Promise<string> {
   const { userId } = await auth();
-  if (!userId) {
-    throw new Error("Not signed in");
-  }
+  if (!userId) redirect("/sign-in");
   return userId;
 }
 
 /**
- * Lazy-ensure the user has a row in our `users` table. Clerk owns identity;
- * we mirror just enough to FK other tables.
+ * Route-handler flavour: returns the user id or null. Callers respond 401
+ * themselves.
  */
-export async function ensureUserRow(): Promise<string> {
-  const userId = await requireUserId();
+export async function getApiUserId(): Promise<string | null> {
+  const { userId } = await auth();
+  return userId ?? null;
+}
+
+/**
+ * Mirror Clerk's user into our `users` table (and create a settings row).
+ * Pure DB operation — does no auth checks, takes the userId from a caller
+ * that already authenticated.
+ */
+async function mirrorUser(userId: string): Promise<void> {
   const user = await currentUser();
   await db()
     .insert(schema.users)
@@ -38,13 +46,30 @@ export async function ensureUserRow(): Promise<string> {
           user?.fullName ?? user?.username ?? user?.firstName ?? null,
       },
     });
-
-  // Make sure settings row exists.
   await db()
     .insert(schema.userSettings)
     .values({ userId })
     .onConflictDoNothing();
+}
 
+/**
+ * Server-component flavour: require auth + lazily ensure the user is
+ * mirrored in our DB. Redirects to /sign-in if unsigned.
+ */
+export async function ensureUserRow(): Promise<string> {
+  const userId = await requireUserId();
+  await mirrorUser(userId);
+  return userId;
+}
+
+/**
+ * Route-handler flavour: returns null when unsigned so callers can respond
+ * 401. Mirrors the user if signed in.
+ */
+export async function ensureUserRowForApi(): Promise<string | null> {
+  const userId = await getApiUserId();
+  if (!userId) return null;
+  await mirrorUser(userId);
   return userId;
 }
 

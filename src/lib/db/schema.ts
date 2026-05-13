@@ -49,6 +49,8 @@ export const quoteProviderEnum = pgEnum("quote_provider", [
   "polygon",
 ]);
 
+export const displayCurrencyEnum = pgEnum("display_currency", ["CAD", "USD"]);
+
 // ──────────────────────────────────────────────────────────────────────────
 // Users (Clerk subject is the PK)
 // ──────────────────────────────────────────────────────────────────────────
@@ -69,6 +71,12 @@ export const userSettings = pgTable("user_settings", {
     .references(() => users.id, { onDelete: "cascade" }),
   // Yahoo by default. Polygon only honoured if POLYGON_API_KEY env var is set.
   quoteProvider: quoteProviderEnum("quote_provider").notNull().default("yahoo"),
+  // Default currency for display. CAD for Canadian-broker users; USD also
+  // available. Stored amounts stay in their native + CAD forms; conversion
+  // is render-time using a single live USD/CAD FX rate.
+  displayCurrency: displayCurrencyEnum("display_currency")
+    .notNull()
+    .default("CAD"),
   // Stealth mode: globally mask $ amounts in this user's own dashboard.
   stealthDefault: boolean("stealth_default").notNull().default(false),
   // For group views — whether to show dollar amounts to group members (default off:
@@ -301,6 +309,92 @@ export const liveQuotes = pgTable(
       .notNull()
       .defaultNow(),
   },
+);
+
+// ──────────────────────────────────────────────────────────────────────────
+// Watchlist — per-user list of instruments the user wants to track without
+// necessarily holding. `graduated` flips to true once an instrument shows up
+// in an uploaded snapshot (i.e. they now own it).
+// ──────────────────────────────────────────────────────────────────────────
+
+export const watchlist = pgTable(
+  "watchlist",
+  {
+    id: serial("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    instrumentId: integer("instrument_id")
+      .notNull()
+      .references(() => instruments.id, { onDelete: "cascade" }),
+    notes: text("notes"),
+    graduated: boolean("graduated").notNull().default(false),
+    addedAt: timestamp("added_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    uniqUserInstr: uniqueIndex("watchlist_user_instrument_uniq").on(
+      t.userId,
+      t.instrumentId,
+    ),
+  }),
+);
+
+// ──────────────────────────────────────────────────────────────────────────
+// News cache — shared across users, keyed on (instrument, news provider id).
+// ──────────────────────────────────────────────────────────────────────────
+
+export const newsItems = pgTable(
+  "news_items",
+  {
+    id: serial("id").primaryKey(),
+    instrumentId: integer("instrument_id")
+      .notNull()
+      .references(() => instruments.id, { onDelete: "cascade" }),
+    providerId: text("provider_id").notNull(), // dedup key from upstream
+    title: text("title").notNull(),
+    link: text("link").notNull(),
+    publisher: text("publisher"),
+    publishedAt: timestamp("published_at", { withTimezone: true }).notNull(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    uniqInstrProv: uniqueIndex("news_instrument_provider_uniq").on(
+      t.instrumentId,
+      t.providerId,
+    ),
+    idxInstrPublished: index("news_instrument_published_idx").on(
+      t.instrumentId,
+      t.publishedAt,
+    ),
+  }),
+);
+
+// ──────────────────────────────────────────────────────────────────────────
+// Sentiment cache — per (instrument, source), updated periodically.
+// ──────────────────────────────────────────────────────────────────────────
+
+export const sentimentCache = pgTable(
+  "sentiment_cache",
+  {
+    instrumentId: integer("instrument_id")
+      .notNull()
+      .references(() => instruments.id, { onDelete: "cascade" }),
+    source: text("source").notNull(), // 'stocktwits' | 'reddit'
+    bullPct: numeric("bull_pct", { precision: 5, scale: 2 }),
+    bearPct: numeric("bear_pct", { precision: 5, scale: 2 }),
+    mentions24h: integer("mentions_24h"),
+    sampleSize: integer("sample_size"),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.instrumentId, t.source] }),
+  }),
 );
 
 // ──────────────────────────────────────────────────────────────────────────

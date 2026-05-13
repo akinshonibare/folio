@@ -20,14 +20,40 @@ const usdFmt = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 0,
 });
 
+const usdFmtCents = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 2,
+});
+
 export function formatCad(amount: number, opts?: { cents?: boolean }): string {
   if (!Number.isFinite(amount)) return "—";
   return opts?.cents ? cadFmtCents.format(amount) : cadFmt.format(amount);
 }
 
-export function formatUsd(amount: number): string {
+export function formatUsd(amount: number, opts?: { cents?: boolean }): string {
   if (!Number.isFinite(amount)) return "—";
-  return usdFmt.format(amount);
+  return opts?.cents ? usdFmtCents.format(amount) : usdFmt.format(amount);
+}
+
+export function formatMoney(
+  amount: number,
+  currency: "CAD" | "USD",
+  opts?: { cents?: boolean },
+): string {
+  return currency === "USD"
+    ? formatUsd(amount, opts)
+    : formatCad(amount, opts);
+}
+
+export function formatDeltaMoney(
+  amount: number,
+  currency: "CAD" | "USD",
+): string {
+  if (!Number.isFinite(amount)) return "—";
+  const fmt = currency === "USD" ? usdFmtCents : cadFmtCents;
+  const sign = amount > 0 ? "+" : amount < 0 ? "−" : "";
+  return `${sign}${fmt.format(Math.abs(amount))}`;
 }
 
 export function formatPct(pct: number, opts?: { sign?: boolean }): string {

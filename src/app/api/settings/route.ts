@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { ensureUserRow } from "@/lib/auth/session";
+import { ensureUserRowForApi } from "@/lib/auth/session";
 import { db, schema } from "@/lib/db/client";
 import { eq, sql } from "drizzle-orm";
 import { polygonAvailable } from "@/lib/quotes/provider";
@@ -10,15 +10,14 @@ export const dynamic = "force-dynamic";
 
 const Body = z.object({
   quoteProvider: z.enum(["yahoo", "polygon"]).optional(),
+  displayCurrency: z.enum(["CAD", "USD"]).optional(),
   stealthDefault: z.boolean().optional(),
   shareDollarsInGroups: z.boolean().optional(),
 });
 
 export async function PATCH(req: Request) {
-  let userId: string;
-  try {
-    userId = await ensureUserRow();
-  } catch {
+  const userId = await ensureUserRowForApi();
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const body = Body.safeParse(await req.json().catch(() => null));

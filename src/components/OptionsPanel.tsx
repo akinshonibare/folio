@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { Cash } from "./Cash";
 import { daysUntil, formatQuantity } from "@/lib/format";
 import type { HoldingRow } from "@/lib/db/queries";
@@ -65,11 +66,15 @@ function OptionCard({
   const dte = opt.optionExpiry ? daysUntil(opt.optionExpiry) : null;
   const strike = opt.optionStrike ? parseFloat(opt.optionStrike) : null;
   const qty = parseFloat(opt.quantity); // number of contracts
-  const fx = fxRates[opt.marketValueNativeCurrency] ?? 1;
-  const valueCad = parseFloat(opt.marketValueNative) * fx;
+  // Surface the missing FX rather than silently treating USD as 1:1 CAD.
+  const fx = fxRates[opt.marketValueNativeCurrency];
+  const fxKnown = typeof fx === "number" && Number.isFinite(fx);
+  const valueCad = fxKnown
+    ? parseFloat(opt.marketValueNative) * fx
+    : NaN;
   const costCad = parseFloat(opt.bookValueCad);
-  const ret = valueCad - costCad;
-  const retPct = costCad > 0 ? (ret / costCad) * 100 : 0;
+  const ret = fxKnown ? valueCad - costCad : NaN;
+  const retPct = fxKnown && costCad > 0 ? (ret / costCad) * 100 : 0;
   const pos = ret >= 0;
 
   const expiringSoon = dte !== null && dte <= 14;
@@ -78,13 +83,16 @@ function OptionCard({
   return (
     <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)]/50 p-4">
       <div className="flex items-baseline justify-between">
-        <div>
+        <Link
+          href={`/t/${encodeURIComponent(opt.optionUnderlying ?? "")}`}
+          className="transition hover:text-[color:var(--color-accent)]"
+        >
           <div className="text-lg font-semibold">{opt.optionUnderlying}</div>
           <div className="text-xs text-[color:var(--color-fg-subtle)]">
             {opt.accountClassification} · {opt.optionType}
             {strike !== null && ` · $${strike.toLocaleString()}`}
           </div>
-        </div>
+        </Link>
         {dte !== null && (
           <span
             className="pill text-xs"

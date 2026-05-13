@@ -1,14 +1,15 @@
 "use client";
 
 import { useStealth } from "./StealthContext";
-import { formatCad, formatDeltaCad } from "@/lib/format";
+import { useCurrency, toDisplay } from "./CurrencyContext";
+import { formatMoney, formatDeltaMoney } from "@/lib/format";
 
 /**
- * Renders a dollar amount. When stealth mode is on, the value is replaced by
- * dots of similar visual width so the layout doesn't jump.
+ * Renders a CAD-denominated amount in the user's display currency
+ * (CAD or USD). Stealth mode masks the value to dots.
  *
  * Always import this — never call `formatCad(...)` directly in user-facing
- * components. That's the invariant that keeps stealth mode comprehensive.
+ * components. This is the funnel for both stealth mode AND currency display.
  */
 export function Cash({
   amount,
@@ -16,15 +17,18 @@ export function Cash({
   cents,
   className,
 }: {
+  /** CAD-denominated amount (the canonical internal unit). */
   amount: number;
   delta?: boolean;
   cents?: boolean;
   className?: string;
 }) {
   const { stealth } = useStealth();
+  const ctx = useCurrency();
+  const converted = toDisplay(amount, ctx);
   const display = delta
-    ? formatDeltaCad(amount)
-    : formatCad(amount, { cents });
+    ? formatDeltaMoney(converted, ctx.displayCurrency)
+    : formatMoney(converted, ctx.displayCurrency, { cents });
   if (stealth) {
     return (
       <span className={`num ${className ?? ""}`} aria-label="hidden">

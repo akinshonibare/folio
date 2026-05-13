@@ -4,6 +4,7 @@ import { useState } from "react";
 
 type Settings = {
   quoteProvider: "yahoo" | "polygon";
+  displayCurrency: "CAD" | "USD";
   stealthDefault: boolean;
   shareDollarsInGroups: boolean;
 };
@@ -45,6 +46,24 @@ export function SettingsForm({
 
   return (
     <div className="space-y-4">
+      <Row
+        title="Display currency"
+        hint="What unit your portfolio rolls up to. Native price columns always show the local currency; this only affects totals."
+      >
+        <select
+          value={s.displayCurrency}
+          onChange={(e) => {
+            const next = e.target.value as Settings["displayCurrency"];
+            save({ displayCurrency: next });
+            // Reload so the layout's currency context picks up the new value.
+            setTimeout(() => window.location.reload(), 300);
+          }}
+          className="rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2 text-sm"
+        >
+          <option value="CAD">CAD — Canadian dollar</option>
+          <option value="USD">USD — US dollar</option>
+        </select>
+      </Row>
       <Row
         title="Quote provider"
         hint={

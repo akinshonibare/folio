@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
-import { Eye, EyeOff, Upload, Settings as SettingsIcon } from "lucide-react";
+import { Eye, EyeOff, Upload, Settings as SettingsIcon, Star } from "lucide-react";
 import { useStealth } from "./StealthContext";
+import { SearchBar } from "./SearchBar";
 
 export function Header() {
   const { stealth, toggle } = useStealth();
@@ -17,6 +18,15 @@ export function Header() {
           </span>
         </Link>
         <nav className="flex items-center gap-2">
+          <SearchBar />
+          <Link
+            href="/watchlist"
+            aria-label="Watchlist"
+            className="rounded-full p-2 text-[color:var(--color-fg-muted)] transition hover:bg-[color:var(--color-surface-2)] hover:text-[color:var(--color-fg)]"
+            title="Watchlist"
+          >
+            <Star size={18} />
+          </Link>
           <button
             type="button"
             onClick={toggle}
@@ -31,12 +41,12 @@ export function Header() {
             className="flex items-center gap-1.5 rounded-full bg-[color:var(--color-surface-2)] px-3 py-1.5 text-sm text-[color:var(--color-fg-muted)] transition hover:text-[color:var(--color-fg)]"
           >
             <Upload size={14} />
-            <span>Upload</span>
+            <span className="hidden sm:inline">Upload</span>
           </Link>
           <Link
             href="/settings"
             aria-label="Settings"
-            className="rounded-full p-2 text-[color:var(--color-fg-muted)] transition hover:bg-[color:var(--color-surface-2)] hover:text-[color:var(--color-fg)]"
+            className="hidden rounded-full p-2 text-[color:var(--color-fg-muted)] transition hover:bg-[color:var(--color-surface-2)] hover:text-[color:var(--color-fg)] sm:flex"
           >
             <SettingsIcon size={18} />
           </Link>

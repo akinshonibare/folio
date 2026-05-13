@@ -30,26 +30,26 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ClerkProvider
-      appearance={{
-        variables: {
-          colorPrimary: "#7A8CFA",
-          colorBackground: "#0B0E16",
-          colorInputBackground: "#181C26",
-          colorInputText: "#F2F4F7",
-          colorText: "#F2F4F7",
-          colorTextSecondary: "#8B91A1",
-        },
-      }}
-    >
-      <html lang="en">
-        <body>
+    <html lang="en">
+      <body>
+        <ClerkProvider
+          appearance={{
+            variables: {
+              colorPrimary: "#7A8CFA",
+              colorBackground: "#0B0E16",
+              colorInputBackground: "#181C26",
+              colorInputText: "#F2F4F7",
+              colorText: "#F2F4F7",
+              colorTextSecondary: "#8B91A1",
+            },
+          }}
+        >
           <StealthProvider>
             {children}
             <PWARegister />
           </StealthProvider>
-        </body>
-      </html>
-    </ClerkProvider>
+        </ClerkProvider>
+      </body>
+    </html>
   );
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ensureUserRow, getUserSettings } from "@/lib/auth/session";
+import { ensureUserRowForApi, getUserSettings } from "@/lib/auth/session";
 import { db, schema } from "@/lib/db/client";
 import { getFetcher } from "@/lib/quotes/provider";
 import { getLatestSnapshot, getHoldings } from "@/lib/db/queries";
@@ -14,10 +14,8 @@ export const dynamic = "force-dynamic";
  * price them reliably) — see TODO.md phase 7 for Polygon.
  */
 export async function POST() {
-  let userId: string;
-  try {
-    userId = await ensureUserRow();
-  } catch {
+  const userId = await ensureUserRowForApi();
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const settings = await getUserSettings(userId);

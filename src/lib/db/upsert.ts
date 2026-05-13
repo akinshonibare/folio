@@ -1,5 +1,5 @@
 import { db, schema } from "@/lib/db/client";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { ParsedCsv, ParsedInstrument } from "@/lib/csv/parse";
 
 export type UpsertResult = {
@@ -113,6 +113,21 @@ export async function ingestCsv(
         unrealizedReturnNativeCurrency: p.unrealizedReturnNativeCurrency,
       });
     inserted++;
+  }
+
+  // Auto-graduate watchlist: any instrument we just inserted positions for
+  // and which is on this user's watchlist gets `graduated = true`.
+  const heldInstrumentIds = Array.from(instrMap.values());
+  if (heldInstrumentIds.length) {
+    await db()
+      .update(schema.watchlist)
+      .set({ graduated: true })
+      .where(
+        and(
+          eq(schema.watchlist.userId, userId),
+          inArray(schema.watchlist.instrumentId, heldInstrumentIds),
+        ),
+      );
   }
 
   return {

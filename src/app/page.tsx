@@ -5,6 +5,6 @@ export const dynamic = "force-dynamic";
 
 export default async function RootPage() {
   const { userId } = await auth();
-  if (userId) redirect("/dashboard");
+  if (userId) redirect("/home");
   redirect("/sign-in");
 }
