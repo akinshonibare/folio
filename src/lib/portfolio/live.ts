@@ -15,7 +15,7 @@ export type LivePosition = {
    *  marketPrice when no live quote is available. */
   livePrice: number;
   livePriceCurrency: string;
-  livePriceProvider: "yahoo" | "finnhub" | "broker";
+  livePriceProvider: "yahoo" | "finnhub" | "polygon" | "broker";
 
   /** % change over the past 24h (today vs previous close). Null when the
    *  provider didn't supply it. */
@@ -60,22 +60,23 @@ export type LivePortfolio = {
 export async function buildLivePortfolio(
   holdings: HoldingRow[],
 ): Promise<LivePortfolio> {
-  // Live quotes for equities + ETFs + crypto. Options skipped (provider
-  // gap); they retain broker price.
-  const targets = holdings
-    .filter((h) => h.securityType !== "OPTION")
-    .map((h) => ({
-      instrumentId: h.instrumentId,
-      symbol: h.symbol,
-      exchange: h.exchange,
-      kind:
-        h.securityType === "CRYPTOCURRENCY"
-          ? ("crypto" as const)
-          : h.securityType === "EXCHANGE_TRADED_FUND"
-          ? ("etf" as const)
-          : ("equity" as const),
-      brokerCurrency: h.marketPriceCurrency,
-    }));
+  // Live quotes for everything we can price: equities, ETFs, crypto, AND
+  // options (via Polygon/Massive). Options without a Polygon quote fall back
+  // to broker-uploaded marketValueNative in the per-position loop below.
+  const targets = holdings.map((h) => ({
+    instrumentId: h.instrumentId,
+    symbol: h.symbol,
+    exchange: h.exchange,
+    kind:
+      h.securityType === "CRYPTOCURRENCY"
+        ? ("crypto" as const)
+        : h.securityType === "EXCHANGE_TRADED_FUND"
+        ? ("etf" as const)
+        : h.securityType === "OPTION"
+        ? ("option" as const)
+        : ("equity" as const),
+    brokerCurrency: h.marketPriceCurrency,
+  }));
   const liveMap = await batchLiveQuotes(targets);
 
   // FX rates per currency seen
@@ -111,13 +112,18 @@ export async function buildLivePortfolio(
       provider = "broker";
     }
     const fx = fxCache.get(livePriceCurrency) ?? NaN;
-    // For options, broker-reported market_value_native already includes the
-    // 100x contract multiplier; using `qty × price × fx` would be off by 100.
-    // Same for any non-option position that falls back to broker price (we
-    // trust broker MV in that case).
+    // Value calc depends on whether we have a live quote AND what kind of
+    // instrument it is:
+    //   - Live equity/ETF/crypto: qty × livePrice × FX.
+    //   - Live option: qty (contracts) × livePrice (premium/share) × 100 ×
+    //     FX (broker reports MV that way; Polygon also returns premium/share).
+    //   - No live quote: trust broker's reported market_value_native × FX.
     let liveValueCad: number;
     if (live) {
-      liveValueCad = Number.isFinite(fx) ? qty * livePrice * fx : 0;
+      const contractMul = h.securityType === "OPTION" ? 100 : 1;
+      liveValueCad = Number.isFinite(fx)
+        ? qty * livePrice * contractMul * fx
+        : 0;
     } else {
       const brokerFx =
         fxCache.get(h.marketValueNativeCurrency) ??

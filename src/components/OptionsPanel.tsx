@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { Cash } from "./Cash";
 import { daysUntil, formatQuantity } from "@/lib/format";
+import { OptionsRefreshButton } from "./OptionsRefreshButton";
 import type { HoldingRow } from "@/lib/db/queries";
 import type { LivePosition } from "@/lib/portfolio/live";
 
@@ -44,9 +45,12 @@ export function OptionsPanel({
         <h2 className="text-sm font-medium text-[color:var(--color-fg-muted)]">
           Options ({options.length})
         </h2>
-        <span className="text-xs text-[color:var(--color-fg-subtle)]">
-          sorted by expiry · prices from your last CSV
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="hidden text-xs text-[color:var(--color-fg-subtle)] sm:inline">
+            sorted by expiry
+          </span>
+          <OptionsRefreshButton />
+        </div>
       </div>
       <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
         {sorted.map((o) => (
