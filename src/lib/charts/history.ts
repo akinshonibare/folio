@@ -1,4 +1,4 @@
-import yahooFinance from "yahoo-finance2";
+import { yahoo as yahooFinance } from "@/lib/yahoo/client";
 
 export type Range = "1W" | "1M" | "3M" | "1Y" | "ALL";
 

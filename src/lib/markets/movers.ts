@@ -1,4 +1,4 @@
-import yahooFinance from "yahoo-finance2";
+import { yahoo as yahooFinance } from "@/lib/yahoo/client";
 
 export type Mover = {
   symbol: string;
@@ -38,12 +38,22 @@ export async function fetchScreener(
   count = 12,
 ): Promise<Mover[]> {
   try {
-    const r = (await yahooFinance.screener({
-      scrIds,
-      count,
-      lang: "en-US",
-      region: "US",
-    })) as YahooScreenerResult;
+    // yahoo-finance2's screener overload typing makes passing the moduleOptions
+    // (for validateResult: false) gnarly. We bypass via `as never` because
+    // Yahoo's screener payload schema changes upstream and validation
+    // routinely false-positives — better to accept whatever they return and
+    // pick out the fields we use ourselves.
+    const r = (await (
+      yahooFinance.screener as unknown as (
+        opts: { scrIds: string; count: number; lang: string; region: string },
+        queryOptions: Record<string, never>,
+        moduleOptions: { validateResult: false },
+      ) => Promise<unknown>
+    )(
+      { scrIds, count, lang: "en-US", region: "US" },
+      {},
+      { validateResult: false },
+    )) as YahooScreenerResult;
     return (r.quotes ?? [])
       .filter((q) => q.symbol)
       .map(toMover);

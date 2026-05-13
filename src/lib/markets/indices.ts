@@ -1,4 +1,4 @@
-import yahooFinance from "yahoo-finance2";
+import { yahoo as yahooFinance } from "@/lib/yahoo/client";
 import { fetchHistory } from "@/lib/charts/history";
 
 export type IndexQuote = {

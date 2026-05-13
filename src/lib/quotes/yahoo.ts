@@ -1,4 +1,4 @@
-import yahooFinance from "yahoo-finance2";
+import { yahoo as yahooFinance } from "@/lib/yahoo/client";
 import type { Quote, QuoteFetcher, QuoteRequest } from "./types";
 import { yahooSymbolFor } from "@/lib/markets/symbol";
 

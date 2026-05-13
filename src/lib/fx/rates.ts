@@ -1,4 +1,4 @@
-import yahooFinance from "yahoo-finance2";
+import { yahoo as yahooFinance } from "@/lib/yahoo/client";
 
 /**
  * Fetch a single FX rate via Yahoo (free, no key).

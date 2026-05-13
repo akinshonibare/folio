@@ -1,5 +1,5 @@
 import Link from "next/link";
-import yahooFinance from "yahoo-finance2";
+import { yahoo as yahooFinance } from "@/lib/yahoo/client";
 import { ensureUserRow } from "@/lib/auth/session";
 import { getWatchlist } from "@/lib/db/watchlist";
 import { TopBar } from "@/components/ui/TopBar";

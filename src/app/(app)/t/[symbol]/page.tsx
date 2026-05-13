@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import yahooFinance from "yahoo-finance2";
+import { yahoo as yahooFinance } from "@/lib/yahoo/client";
 import { ensureUserRow } from "@/lib/auth/session";
 import { getPositionsForSymbol } from "@/lib/db/queries";
 import {
